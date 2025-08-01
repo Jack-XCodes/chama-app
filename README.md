@@ -42,7 +42,7 @@ Chama App is designed to help traditional savings groups (Chamas) digitize their
 
 ## 🏗 Tech Stack
 
-- **Backend**: Laravel 11
+- **Backend**: Laravel 12
 - **Admin Panel**: Filament v3
 - **Authentication**: Laravel Fortify / Filament Auth
 - **Database**: MySQL/PostgreSQL
