@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Filament theme overrides kept minimal to avoid manifest errors
+   until full theming is finalized. */
+
