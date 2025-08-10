@@ -6,7 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Notifications\PaymentStatusChanged;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class Transaction extends Model
@@ -21,14 +23,17 @@ class Transaction extends Model
         'proof_file',
         'status',
         'treasurer_notes',
+        'category_id',
         'processed_by',
         'processed_at',
         'metadata',
+        'audit_trail',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'metadata' => 'array',
+        'audit_trail' => 'array',
         'processed_at' => 'datetime',
     ];
 
@@ -46,6 +51,60 @@ class Transaction extends Model
     public function processor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'processed_by');
+    }
+
+    /**
+     * Get the category of the transaction.
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(TransactionCategory::class);
+    }
+
+    /**
+     * Get the tags for this transaction.
+     */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(TransactionTag::class, 'transaction_tag')
+            ->withPivot('tagged_by', 'tagged_at')
+            ->using(TransactionTagPivot::class);
+    }
+
+    /**
+     * Add a tag to the transaction.
+     */
+    public function addTag(TransactionTag $tag): void
+    {
+        if (!$this->tags->contains($tag->id)) {
+            $this->tags()->attach($tag->id, [
+                'tagged_by' => Auth::id(),
+                'tagged_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Remove a tag from the transaction.
+     */
+    public function removeTag(TransactionTag $tag): void
+    {
+        $this->tags()->detach($tag->id);
+    }
+
+    /**
+     * Log an audit entry.
+     */
+    public function logAudit(string $action, array $data = []): void
+    {
+        $audit = $this->audit_trail ?? [];
+        $audit[] = [
+            'action' => $action,
+            'user_id' => Auth::id(),
+            'timestamp' => now()->toIso8601String(),
+            'data' => $data,
+        ];
+        $this->update(['audit_trail' => $audit]);
     }
 
     /**
@@ -115,6 +174,9 @@ class Transaction extends Model
             throw new \Exception('Transaction cannot be processed');
         }
 
+        $oldStatus = $this->status;
+        $oldNotes = $this->treasurer_notes;
+
         $this->update([
             'status' => $status,
             'treasurer_notes' => $notes,
@@ -122,7 +184,62 @@ class Transaction extends Model
             'processed_at' => now(),
         ]);
 
+        // Log the status change
+        $this->logAudit('status_changed', [
+            'old_status' => $oldStatus,
+            'new_status' => $status,
+            'old_notes' => $oldNotes,
+            'new_notes' => $notes,
+        ]);
+
         // Send notification to the user
         $this->user->notify(new PaymentStatusChanged($this));
+    }
+
+    /**
+     * Bulk process multiple transactions.
+     */
+    public static function bulkProcess(array $ids, string $status, ?string $notes = null, User $processor): void
+    {
+        $transactions = self::whereIn('id', $ids)
+            ->where('status', 'pending')
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            $transaction->process($status, $notes, $processor);
+        }
+    }
+
+    /**
+     * Bulk tag multiple transactions.
+     */
+    public static function bulkTag(array $ids, TransactionTag $tag): void
+    {
+        $transactions = self::whereIn('id', $ids)->get();
+
+        foreach ($transactions as $transaction) {
+            $transaction->addTag($tag);
+            $transaction->logAudit('tag_added', [
+                'tag_id' => $tag->id,
+                'tag_name' => $tag->name,
+            ]);
+        }
+    }
+
+    /**
+     * Bulk categorize multiple transactions.
+     */
+    public static function bulkCategorize(array $ids, TransactionCategory $category): void
+    {
+        $transactions = self::whereIn('id', $ids)->get();
+
+        foreach ($transactions as $transaction) {
+            $oldCategory = $transaction->category_id;
+            $transaction->update(['category_id' => $category->id]);
+            $transaction->logAudit('category_changed', [
+                'old_category_id' => $oldCategory,
+                'new_category_id' => $category->id,
+            ]);
+        }
     }
 }
