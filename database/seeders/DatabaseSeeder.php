@@ -51,5 +51,11 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Administrator', 'password' => bcrypt('password')]
         );
         $admin->assignRole($adminRole);
+
+        // Seed transaction categories and tags
+        $this->call([
+            TransactionCategorySeeder::class,
+            TransactionTagSeeder::class,
+        ]);
     }
 }

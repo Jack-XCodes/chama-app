@@ -31,8 +31,17 @@ class ManualTransaction extends Component
     #[Rule('nullable|file|mimes:jpg,jpeg,png,pdf|max:5120')] // 5MB max
     public $proof_file;
 
+    #[Rule('nullable|string')]
+    public $reference_number = '';
+
+    #[Rule('nullable|date')]
+    public $transaction_date = '';
+
+    public $requires_verification = false;
+
     public function mount()
     {
+        $this->transaction_date = now()->format('Y-m-d');
         $this->loadCategories();
         $this->loadTags();
     }
@@ -71,19 +80,37 @@ class ManualTransaction extends Component
             $path = $this->proof_file->store('transaction-proofs', 'private');
         }
 
+        // Determine amount sign based on transaction type
+        $amount = $this->amount;
+        if (in_array($this->type, [Transaction::TYPE_EXPENSE, Transaction::TYPE_BANK_CHARGE])) {
+            $amount = -abs($this->amount);
+        } else {
+            $amount = abs($this->amount);
+        }
+
+        // Check if verification is required
+        $status = Transaction::STATUS_APPROVED;
+        if ($this->requires_verification || abs($amount) >= Transaction::VERIFICATION_THRESHOLD) {
+            $status = Transaction::STATUS_REQUIRES_VERIFICATION;
+        }
+
         $transaction = Transaction::create([
             'user_id' => Auth::id(),
-            'amount' => $this->type === 'expense' ? -abs($this->amount) : abs($this->amount),
+            'amount' => $amount,
             'type' => $this->type,
             'description' => $this->description,
             'proof_file' => $path,
             'category_id' => $this->category_id,
-            'status' => 'approved', // Auto-approve treasurer entries
+            'status' => $status,
             'processed_by' => Auth::id(),
             'processed_at' => now(),
+            'reference_number' => $this->reference_number,
+            'transaction_date' => $this->transaction_date,
+            'requires_verification' => $this->requires_verification || abs($amount) >= Transaction::VERIFICATION_THRESHOLD,
             'metadata' => [
                 'manual_entry' => true,
                 'original_filename' => $this->proof_file ? $this->proof_file->getClientOriginalName() : null,
+                'entry_method' => 'treasurer_manual',
             ],
         ]);
 
@@ -100,14 +127,22 @@ class ManualTransaction extends Component
             'type' => $this->type,
             'category_id' => $this->category_id,
             'tags' => $this->selected_tags,
+            'reference_number' => $this->reference_number,
+            'requires_verification' => $transaction->requires_verification,
         ]);
 
-        $this->reset(['amount', 'description', 'proof_file', 'selected_tags']);
+        $this->reset(['amount', 'description', 'proof_file', 'selected_tags', 'reference_number']);
+        $this->transaction_date = now()->format('Y-m-d');
+        $this->requires_verification = false;
+        
+        session()->flash('message', 'Transaction created successfully!');
         $this->dispatch('transaction-created');
     }
 
     public function render()
     {
-        return view('livewire.treasurer.manual-transaction');
+        return view('livewire.treasurer.manual-transaction', [
+            'transactionTypes' => Transaction::getTransactionTypes(),
+        ]);
     }
 }

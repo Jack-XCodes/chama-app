@@ -52,52 +52,96 @@ class Dashboard extends Component
 
     public function render()
     {
-        $pendingCount = Transaction::where('status', 'pending')->count();
-        $pendingAmount = Transaction::where('status', 'pending')->sum('amount');
+        // Pending transactions requiring attention
+        $pendingCount = Transaction::where('status', Transaction::STATUS_PENDING)->count();
+        $pendingAmount = Transaction::where('status', Transaction::STATUS_PENDING)->sum('amount');
+        
+        // Verification queue
+        $verificationCount = Transaction::where('status', Transaction::STATUS_REQUIRES_VERIFICATION)->count();
+        $verificationAmount = Transaction::where('status', Transaction::STATUS_REQUIRES_VERIFICATION)->sum('amount');
 
-        $recentActivity = Transaction::with(['user', 'category'])
+        // Recent activity
+        $recentActivity = Transaction::with(['user', 'category', 'processor', 'verifier'])
             ->latest()
-            ->limit(5)
+            ->limit(8)
             ->get();
 
+        // Category analysis
         $categoryTotals = TransactionCategory::query()
             ->withSum(['transactions' => function ($query) {
-                $query->where('status', 'approved');
+                $query->whereIn('status', [Transaction::STATUS_APPROVED, Transaction::STATUS_VERIFIED]);
             }], 'amount')
             ->withCount(['transactions' => function ($query) {
-                $query->where('status', 'approved');
+                $query->whereIn('status', [Transaction::STATUS_APPROVED, Transaction::STATUS_VERIFIED]);
             }])
             ->orderByRaw('ABS(transactions_sum_amount) DESC')
             ->limit(5)
             ->get();
 
+        // Popular tags
         $topTags = TransactionTag::query()
             ->withCount(['transactions' => function ($query) {
-                $query->where('status', 'approved');
+                $query->whereIn('status', [Transaction::STATUS_APPROVED, Transaction::STATUS_VERIFIED]);
             }])
             ->orderByDesc('transactions_count')
-            ->limit(5)
+            ->limit(6)
             ->get();
 
-        $totalBalance = Transaction::where('status', 'approved')->sum('amount');
-        $monthlyIncome = Transaction::where('status', 'approved')
+        // Financial metrics
+        $totalBalance = Transaction::whereIn('status', [Transaction::STATUS_APPROVED, Transaction::STATUS_VERIFIED])->sum('amount');
+        
+        $monthlyIncome = Transaction::whereIn('status', [Transaction::STATUS_APPROVED, Transaction::STATUS_VERIFIED])
             ->where('amount', '>', 0)
             ->where('created_at', '>=', now()->startOfMonth())
             ->sum('amount');
-        $monthlyExpense = abs(Transaction::where('status', 'approved')
+            
+        $monthlyExpense = abs(Transaction::whereIn('status', [Transaction::STATUS_APPROVED, Transaction::STATUS_VERIFIED])
             ->where('amount', '<', 0)
             ->where('created_at', '>=', now()->startOfMonth())
             ->sum('amount'));
 
+        // Transaction type breakdown for current month
+        $transactionTypeBreakdown = Transaction::whereIn('status', [Transaction::STATUS_APPROVED, Transaction::STATUS_VERIFIED])
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->selectRaw('type, COUNT(*) as count, SUM(amount) as total')
+            ->groupBy('type')
+            ->get();
+
+        // Large transactions requiring attention
+        $largeTransactions = Transaction::largeTransactions()
+            ->whereIn('status', [Transaction::STATUS_PENDING, Transaction::STATUS_REQUIRES_VERIFICATION])
+            ->with(['user', 'category'])
+            ->orderByDesc('amount')
+            ->limit(5)
+            ->get();
+
+        // Quick stats for alerts
+        $alertStats = [
+            'overdue_verifications' => Transaction::where('status', Transaction::STATUS_REQUIRES_VERIFICATION)
+                ->where('created_at', '<', now()->subDays(3))
+                ->count(),
+            'high_value_pending' => Transaction::where('status', Transaction::STATUS_PENDING)
+                ->where('amount', '>=', Transaction::VERIFICATION_THRESHOLD)
+                ->count(),
+            'rejected_this_week' => Transaction::where('status', Transaction::STATUS_REJECTED)
+                ->where('created_at', '>=', now()->startOfWeek())
+                ->count(),
+        ];
+
         return view('livewire.treasurer.dashboard', [
             'pendingCount' => $pendingCount,
             'pendingAmount' => $pendingAmount,
+            'verificationCount' => $verificationCount,
+            'verificationAmount' => $verificationAmount,
             'recentActivity' => $recentActivity,
             'categoryTotals' => $categoryTotals,
             'topTags' => $topTags,
             'totalBalance' => $totalBalance,
             'monthlyIncome' => $monthlyIncome,
             'monthlyExpense' => $monthlyExpense,
+            'transactionTypeBreakdown' => $transactionTypeBreakdown,
+            'largeTransactions' => $largeTransactions,
+            'alertStats' => $alertStats,
         ]);
     }
 }
