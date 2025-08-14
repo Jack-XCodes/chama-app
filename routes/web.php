@@ -22,7 +22,16 @@ Route::middleware(['auth', 'permission:manage-documents'])->group(function () {
 });
 
 Route::middleware(['auth', 'permission:manage-finances'])->group(function () {
-    // Add finance management routes here
+    // Finance management routes
+    Route::get('/treasurer/dashboard', \App\Livewire\Treasurer\Dashboard::class)->name('treasurer.dashboard');
+    Route::get('/treasurer/payments', \App\Livewire\Treasurer\PaymentQueue::class)->name('treasurer.payments');
+    Route::get('/treasurer/verification', \App\Livewire\Treasurer\VerificationQueue::class)->name('treasurer.verification');
+    Route::get('/treasurer/manual-transaction', \App\Livewire\Treasurer\ManualTransaction::class)->name('treasurer.manual-transaction');
+    
+    // Report management routes
+    Route::get('/reports/generate', \App\Livewire\Reports\ReportGenerator::class)->name('reports.generate');
+    Route::get('/reports/archive', \App\Livewire\Reports\ReportArchive::class)->name('reports.archive');
+    Route::get('/reports/download/{report}', [App\Http\Controllers\ReportController::class, 'download'])->name('reports.download');
 });
 
 require __DIR__.'/auth.php';
