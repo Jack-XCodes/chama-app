@@ -42,7 +42,16 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                ChamaStats::class,
+                // Key metrics and financial trends
+                \App\Filament\Widgets\KeyMetricsWidget::class,
+                \App\Filament\Widgets\FinancialTrendsWidget::class,
+                
+                // Quick actions and activity feed
+                \App\Filament\Widgets\QuickActionsWidget::class,
+                \App\Filament\Widgets\ActivityFeedWidget::class,
+                
+                // System health and account
+                \App\Filament\Widgets\SystemHealthWidget::class,
                 Widgets\AccountWidget::class,
             ])
             ->middleware([
