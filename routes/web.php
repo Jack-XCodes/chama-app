@@ -34,4 +34,15 @@ Route::middleware(['auth', 'permission:manage-finances'])->group(function () {
     Route::get('/reports/download/{report}', [App\Http\Controllers\ReportController::class, 'download'])->name('reports.download');
 });
 
+// Notification routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/notifications', \App\Livewire\NotificationCenter::class)->name('notifications.index');
+    Route::get('/notification-preferences', \App\Livewire\NotificationPreferences::class)->name('notification-preferences');
+});
+
+// Admin routes
+Route::middleware(['auth', 'permission:manage-users'])->group(function () {
+    Route::get('/admin/announcements', \App\Livewire\Admin\AnnouncementManager::class)->name('admin.announcements');
+});
+
 require __DIR__.'/auth.php';
