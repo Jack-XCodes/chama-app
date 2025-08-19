@@ -2,17 +2,10 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-gray-50">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#8B4513">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
-    <title>{{ config('app.name', 'Chama App') }}</title>
-
-    <!-- PWA -->
-    <link rel="manifest" href="{{ asset('manifest.json') }}">
-    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+    <title>{{ config('app.name', 'Laravel') }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -20,76 +13,6 @@
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @livewireStyles
-
-    <!-- Custom Styles -->
-    <style>
-        [x-cloak] { display: none !important; }
-
-        /* Custom scrollbar for mobile */
-        ::-webkit-scrollbar {
-            width: 4px;
-            height: 4px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 2px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #8B4513;
-            border-radius: 2px;
-        }
-
-        /* Touch-friendly tap targets */
-        button, a, input, select, [role="button"] {
-            min-height: 44px;
-            min-width: 44px;
-        }
-
-        /* Smooth scrolling */
-        html {
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* Prevent text size adjustment on orientation change */
-        body {
-            -webkit-text-size-adjust: 100%;
-            text-size-adjust: 100%;
-        }
-
-        /* Better touch feedback */
-        @media (hover: none) {
-            .hover\:bg-gray-100:hover {
-                background-color: transparent !important;
-            }
-
-            .active\:bg-gray-100:active {
-                background-color: #f3f4f6 !important;
-            }
-        }
-
-        /* Loading indicator */
-        .loading-indicator {
-            @apply fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50;
-        }
-
-        .loading-spinner {
-            @apply animate-spin rounded-full h-12 w-12 border-4;
-            border-top-color: #8B4513;
-            border-right-color: #8B4513;
-            border-bottom-color: transparent;
-            border-left-color: transparent;
-        }
-
-        /* Pull to refresh */
-        .ptr-element {
-            @apply absolute top-0 left-0 w-full overflow-hidden z-10;
-            pointer-events: none;
-        }
-    </style>
 </head>
 <body class="h-full font-sans antialiased">
     <div class="min-h-full">
@@ -194,7 +117,7 @@
             </div>
         </nav>
 
-        <!-- Desktop Navigation -->
+        <!-- Desktop Sidebar -->
         <div class="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
             @include('layouts.app.sidebar')
         </div>
@@ -245,9 +168,9 @@
         <div x-data
              x-show="$store.loading.isLoading"
              x-transition.opacity
-             class="loading-indicator"
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
              x-cloak>
-            <div class="loading-spinner"></div>
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-brown-600 border-t-transparent"></div>
         </div>
     </div>
 
@@ -265,28 +188,6 @@
         // Livewire loading indicators
         Livewire.on('loading', () => Alpine.store('loading').show());
         Livewire.on('loaded', () => Alpine.store('loading').hide());
-
-        // Pull to refresh
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js');
-        }
-
-        // Prevent double tap zoom on iOS
-        document.addEventListener('touchend', (e) => {
-            const now = Date.now();
-            const DOUBLE_TAP_THRESHOLD = 300;
-            if (now - (window.lastTouchEnd || 0) <= DOUBLE_TAP_THRESHOLD) {
-                e.preventDefault();
-            }
-            window.lastTouchEnd = now;
-        }, false);
-
-        // Smooth scrolling for iOS
-        document.addEventListener('touchmove', (e) => {
-            if (e.target.closest('.scrollable')) {
-                e.stopPropagation();
-            }
-        }, { passive: true });
     </script>
 </body>
 </html>

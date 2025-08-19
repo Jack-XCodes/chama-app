@@ -124,4 +124,23 @@ class User extends Authenticatable
     {
         return NotificationPreference::shouldUserReceiveNotification($this, $type, $channel);
     }
+
+    /**
+     * Get user's initials from their name.
+     *
+     * @return string
+     */
+    public function initials(): string
+    {
+        $name_parts = array_filter(explode(' ', $this->name));
+        $initials = '';
+
+        if (count($name_parts) >= 2) {
+            $initials = mb_substr($name_parts[0], 0, 1) . mb_substr(end($name_parts), 0, 1);
+        } elseif (count($name_parts) === 1) {
+            $initials = mb_substr($name_parts[0], 0, 2);
+        }
+
+        return mb_strtoupper($initials);
+    }
 }

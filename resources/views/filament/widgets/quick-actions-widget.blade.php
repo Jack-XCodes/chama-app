@@ -1,15 +1,9 @@
-<x-filament::widget>
-    <x-filament::card>
-        <div class="flex items-center justify-between">
-            <h2 class="text-lg font-medium">Quick Actions</h2>
-        </div>
-
-        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            @foreach ($actions as $action)
-                <div class="col-span-1">
-                    {{ $action }}
-                </div>
+<x-filament-widgets::widget>
+    <div class="p-2 space-y-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            @foreach ($this->getActions() as $action)
+                {{ $action }}
             @endforeach
         </div>
-    </x-filament::card>
-</x-filament::widget>
+    </div>
+</x-filament-widgets::widget>

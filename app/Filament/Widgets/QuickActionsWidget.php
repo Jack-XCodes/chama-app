@@ -2,22 +2,15 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\FinancialReport;
-use App\Models\Transaction;
-use App\Models\User;
-use App\Services\Exports\ReportExportService;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
-use Filament\Forms\Components\Grid;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\ActionSize;
 use Filament\Widgets\Widget;
 use Illuminate\Support\HtmlString;
+use Illuminate\View\View;
+use Filament\Support\Contracts\TranslatableContentDriver;
 
 class QuickActionsWidget extends Widget implements HasActions
 {
@@ -28,230 +21,74 @@ class QuickActionsWidget extends Widget implements HasActions
 
     protected int|string|array $columnSpan = 'full';
 
+    public function makeFilamentTranslatableContentDriver(): ?TranslatableContentDriver
+    {
+        return null;
+    }
+
     public function sendAnnouncement(): Action
     {
         return Action::make('sendAnnouncement')
-            ->label('Send Group Announcement')
-            ->icon('heroicon-m-megaphone')
-            ->color('warning')
+            ->label('Send Announcement')
+            ->icon('heroicon-o-megaphone')
             ->size(ActionSize::Large)
-            ->form([
-                TextInput::make('title')
-                    ->required()
-                    ->maxLength(255)
-                    ->placeholder('Announcement Title'),
-                
-                RichEditor::make('content')
-                    ->required()
-                    ->placeholder('Announcement Content'),
-                
-                Grid::make(2)
-                    ->schema([
-                        Toggle::make('is_urgent')
-                            ->label('Mark as Urgent')
-                            ->default(false),
-                        
-                        Select::make('priority')
-                            ->options([
-                                'low' => 'Low',
-                                'normal' => 'Normal',
-                                'high' => 'High',
-                                'urgent' => 'Urgent',
-                            ])
-                            ->default('normal')
-                            ->required(),
-                    ]),
-                
-                Grid::make(2)
-                    ->schema([
-                        Toggle::make('send_email')
-                            ->label('Send Email')
-                            ->default(true),
-                        
-                        Toggle::make('send_in_app')
-                            ->label('Send In-App')
-                            ->default(true),
-                    ]),
-                
-                Select::make('target_roles')
-                    ->multiple()
-                    ->label('Target Roles')
-                    ->options(\Spatie\Permission\Models\Role::pluck('name', 'name'))
-                    ->placeholder('All Members'),
-            ])
-            ->action(function (array $data): void {
-                $announcement = \App\Models\Announcement::create([
-                    'title' => $data['title'],
-                    'content' => $data['content'],
-                    'is_urgent' => $data['is_urgent'],
-                    'priority' => $data['priority'],
-                    'send_email' => $data['send_email'],
-                    'send_in_app' => $data['send_in_app'],
-                    'target_roles' => $data['target_roles'] ?? null,
-                    'created_by' => auth()->id(),
-                    'is_published' => true,
-                    'published_at' => now(),
-                ]);
-
-                $announcement->publish();
-
-                Notification::make()
-                    ->success()
-                    ->title('Announcement Sent')
-                    ->body('Your announcement has been sent successfully.')
-                    ->send();
-            });
+            ->url(route('admin.announcements'))
+            ->visible(auth()->user()->can('manage-users'));
     }
 
-    public function generateMonthlyReports(): Action
+    public function generateReports(): Action
     {
-        return Action::make('generateMonthlyReports')
-            ->label('Generate Monthly Reports')
-            ->icon('heroicon-m-document-chart-bar')
-            ->color('success')
+        return Action::make('generateReports')
+            ->label('Generate Reports')
+            ->icon('heroicon-o-document-chart-bar')
             ->size(ActionSize::Large)
-            ->form([
-                Select::make('report_types')
-                    ->multiple()
-                    ->label('Select Reports')
-                    ->options(FinancialReport::getReportTypes())
-                    ->required(),
-                
-                Select::make('format')
-                    ->label('Export Format')
-                    ->options(FinancialReport::getExportFormats())
-                    ->default('pdf')
-                    ->required(),
-            ])
-            ->action(function (array $data): void {
-                $exportService = new ReportExportService();
-                $startDate = now()->startOfMonth();
-                $endDate = now();
-                $reports = [];
-
-                foreach ($data['report_types'] as $type) {
-                    try {
-                        $report = $exportService->generateReport(
-                            $type,
-                            $startDate,
-                            $endDate,
-                            $data['format']
-                        );
-                        $reports[] = $report;
-                    } catch (\Exception $e) {
-                        Notification::make()
-                            ->danger()
-                            ->title('Error Generating Report')
-                            ->body("Failed to generate {$type} report: {$e->getMessage()}")
-                            ->send();
-                    }
-                }
-
-                if (!empty($reports)) {
-                    Notification::make()
-                        ->success()
-                        ->title('Reports Generated')
-                        ->body(count($reports) . ' reports have been generated successfully.')
-                        ->actions([
-                            \Filament\Notifications\Actions\Action::make('view')
-                                ->label('View Reports')
-                                ->url(route('reports.archive'))
-                                ->button(),
-                        ])
-                        ->send();
-                }
-            });
+            ->url(route('reports.generate'))
+            ->visible(auth()->user()->can('manage-finances'));
     }
 
-    public function inviteNewMember(): Action
+    public function inviteMembers(): Action
     {
-        return Action::make('inviteNewMember')
-            ->label('Invite New Member')
-            ->icon('heroicon-m-user-plus')
-            ->color('primary')
+        return Action::make('inviteMembers')
+            ->label('Invite Members')
+            ->icon('heroicon-o-user-plus')
             ->size(ActionSize::Large)
-            ->form([
-                TextInput::make('name')
-                    ->required()
-                    ->maxLength(255)
-                    ->placeholder('Member Name'),
-                
-                TextInput::make('email')
-                    ->email()
-                    ->required()
-                    ->maxLength(255)
-                    ->placeholder('Email Address')
-                    ->unique(User::class),
-                
-                Select::make('roles')
-                    ->multiple()
-                    ->label('Assign Roles')
-                    ->options(\Spatie\Permission\Models\Role::pluck('name', 'name')),
-            ])
-            ->action(function (array $data): void {
-                $password = \Str::random(12);
-                
-                $user = User::create([
-                    'name' => $data['name'],
-                    'email' => $data['email'],
-                    'password' => \Hash::make($password),
-                ]);
-
-                if (!empty($data['roles'])) {
-                    $user->assignRole($data['roles']);
-                }
-
-                // Send invitation email with temporary password
-                \Mail::to($user->email)->send(new \App\Mail\MemberInvitation($user, $password));
-
-                Notification::make()
-                    ->success()
-                    ->title('Member Invited')
-                    ->body('An invitation has been sent to ' . $user->email)
-                    ->send();
-            });
+            ->url(route('admin.users.invite'))
+            ->visible(auth()->user()->can('manage-users'));
     }
 
-    public function viewReconciliationQueue(): Action
+    public function viewReconciliation(): Action
     {
-        $pendingCount = Transaction::where('status', Transaction::STATUS_PENDING)
-            ->orWhere('status', Transaction::STATUS_REQUIRES_VERIFICATION)
-            ->count();
-
-        return Action::make('viewReconciliationQueue')
-            ->label('View Reconciliation Queue')
-            ->badge($pendingCount)
-            ->icon('heroicon-m-banknotes')
-            ->color($pendingCount > 0 ? 'warning' : 'gray')
+        return Action::make('viewReconciliation')
+            ->label('Payment Queue')
+            ->icon('heroicon-o-currency-dollar')
             ->size(ActionSize::Large)
-            ->url(route('treasurer.payments'));
+            ->url(route('treasurer.payments'))
+            ->visible(auth()->user()->can('manage-finances'));
     }
 
-    public function memberManagement(): Action
+    public function manageMembers(): Action
     {
-        return Action::make('memberManagement')
-            ->label('Member Management')
-            ->icon('heroicon-m-users')
-            ->color('info')
+        return Action::make('manageMembers')
+            ->label('Manage Members')
+            ->icon('heroicon-o-users')
             ->size(ActionSize::Large)
-            ->url(route('admin.members'));
+            ->url(route('admin.users'))
+            ->visible(auth()->user()->can('manage-users'));
     }
 
-    protected function getViewData(): array
+    protected function getActions(): array
     {
         return [
-            'actions' => [
-                $this->sendAnnouncement(),
-                $this->generateMonthlyReports(),
-                $this->inviteNewMember(),
-                $this->viewReconciliationQueue(),
-                $this->memberManagement(),
-            ],
+            $this->sendAnnouncement(),
+            $this->generateReports(),
+            $this->inviteMembers(),
+            $this->viewReconciliation(),
+            $this->manageMembers(),
         ];
     }
 
     public function render(): View
     {
-        return view('filament.widgets.quick-actions-widget', $this->getViewData());
+        return view('filament.widgets.quick-actions-widget');
     }
 }
